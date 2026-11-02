@@ -127,6 +127,7 @@
         background:rgba(20,14,8,.85);color:#ffd34d;font-size:13px;font-weight:800;cursor:pointer;
       }
       .zoom-reset.show{display:block}
+      .ver-badge{position:absolute;left:10px;bottom:10px;z-index:8;font-size:11px;font-weight:700;color:#ffe1a8;background:rgba(20,14,8,.55);padding:3px 8px;border-radius:999px;pointer-events:none}
       .stamp-el{
         position:absolute;transform-origin:center;cursor:grab;line-height:0;
         filter:drop-shadow(0 2px 5px rgba(0,0,0,.25));
@@ -366,6 +367,7 @@
         <div id="stampHandle" class="stamp-handle" role="button" aria-label="持ち手：ドラッグでスタンプを動かす"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l-3 3-3-3"/><path d="M19 9l3 3-3 3"/><path d="M2 12h20"/><path d="M12 2v20"/></svg>うごかす</div>
         <div class="detect-spin" id="detectSpin"><span>顔を探しています…</span></div>
       </div>
+      <div id="verBadge" class="ver-badge">ver 1.2.0</div>
       <button id="zoomReset" class="zoom-reset" type="button">全体表示</button>
     </div>
 
@@ -955,8 +957,7 @@
     }
     function clampView(){
       if(viewScale<=1){ viewTx=0; viewTy=0; return; }
-      var r=wrap.getBoundingClientRect();
-      var W0=r.width/viewScale, H0=r.height/viewScale;
+      var W0=wrap.clientWidth, H0=wrap.clientHeight;
       viewTx=Math.min(0, Math.max((1-viewScale)*W0, viewTx));
       viewTy=Math.min(0, Math.max((1-viewScale)*H0, viewTy));
     }
@@ -976,8 +977,9 @@
     }
     function onPointerDown(e){
       if(!photoBitmap) return;
+      if(e.target.closest && e.target.closest('.zoom-reset')) return;
       e.preventDefault();
-      wrap.setPointerCapture(e.pointerId);
+      try{ wrap.setPointerCapture(e.pointerId); }catch(_){ }
       var stampEl=e.target.closest('.stamp-el');
       var onHandle=!!e.target.closest('.stamp-handle');
       var p=wrapPoint(e.clientX,e.clientY);
@@ -1004,6 +1006,7 @@
           return;
         }
       }
+      if(!wrap.contains(e.target) && !onHandle) return;
       if(onHandle && selectedStamp()){
         // drag via the external handle: the finger stays below the stamp, never covering it
         var stH=selectedStamp();
@@ -1022,8 +1025,7 @@
         dragState={type:'bg', startX:p.x, startY:p.y, moved:false, startCx:e.clientX, startCy:e.clientY, lastCx:e.clientX, lastCy:e.clientY};
       }
     }
-    wrap.addEventListener('pointerdown', onPointerDown);
-    stampHandleEl.addEventListener('pointerdown', onPointerDown);
+    stage.addEventListener('pointerdown', onPointerDown);
     wrap.addEventListener('dblclick', function(){
       if(viewScale>1){ wrap.classList.add('anim'); resetView(); setTimeout(function(){ wrap.classList.remove('anim'); }, 280); }
     });
