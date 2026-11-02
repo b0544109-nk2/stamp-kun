@@ -368,7 +368,7 @@
         <div id="stampHandle" class="stamp-handle" role="button" aria-label="持ち手：ドラッグでスタンプを動かす"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l-3 3-3-3"/><path d="M19 9l3 3-3 3"/><path d="M2 12h20"/><path d="M12 2v20"/></svg>うごかす</div>
         <div class="detect-spin" id="detectSpin"><span>顔を探しています…</span></div>
       </div>
-      <div id="verBadge" class="ver-badge">ver 1.2.4</div>
+      <div id="verBadge" class="ver-badge">ver 1.2.5</div>
       <button id="zoomReset" class="zoom-reset" type="button">全体表示</button>
     </div>
 
@@ -614,6 +614,7 @@
     var selectedType = STAMPS[0]; // stamp type chosen in tray
     var stamps = [];             // placed: {id,file,x,y,size,rot} x/y = center, fraction of width/height; size = fraction of image width
     var replaceMode=false;        // replace-in-place mode for the selected stamp
+    var engagedId=null;           // stamp deliberately selected/edited: tray taps replace it directly
     var selectedId = null;
     var nextId = 1;
     var imgCache = {};           // file -> Promise<HTMLImageElement>
@@ -731,16 +732,17 @@
           }
         });
       }
-      if(replaceMode){
-        var rst=selectedStamp();
+      var rst=selectedStamp();
+      if(rst && (replaceMode || engagedId===rst.id)){
         replaceMode=false;
         var rb2=$('replaceBtn'); if(rb2) rb2.classList.remove('armed');
-        if(rst){
-          rst.file=s.f; rst.style=currentStyle;
-          pushHistory(rst.file, rst.style);
-          renderStamps();
-          toast('スタンプを切り替えました', '位置・大きさ・傾きはそのままです');
-        }
+        rst.file=s.f; rst.style=currentStyle;
+        pushHistory(rst.file, rst.style);
+        renderStamps();
+        toast('スタンプを切り替えました', '位置・大きさ・傾きはそのままです');
+      } else if(replaceMode){
+        replaceMode=false;
+        var rb5=$('replaceBtn'); if(rb5) rb5.classList.remove('armed');
       }
       if(photoBitmap && mode==='free'){
         // hint only; placement happens on tap
@@ -753,7 +755,7 @@
       // Scope to the style row only — never touch category chips
       $('styleChips').querySelectorAll('.style-chip').forEach(function(c){ c.classList.toggle('active', c===chip); });
       buildTray();
-      if(replaceMode && selectedStamp()){
+      if(selectedStamp() && (replaceMode || engagedId===selectedStamp().id)){
         selectedStamp().style=currentStyle;
         replaceMode=false;
         var rb4=$('replaceBtn'); if(rb4) rb4.classList.remove('armed');
@@ -884,7 +886,7 @@
     }
     function addStamp(file, x, y, size, rot, styleId){
       var st={id:nextId++, file:file, style:styleId||currentStyle, x:x, y:y, size:size, rot:rot||0};
-      stamps.push(st); selectedId=st.id;
+      stamps.push(st); selectedId=st.id; engagedId=null;
       renderStamps(st.id);
       pushHistory(st.file, st.style);
       return st;
@@ -896,11 +898,11 @@
     }
     sizeRange.addEventListener('input', function(){
       var st=selectedStamp(); if(!st) return;
-      st.size=(+sizeRange.value)/100; renderStamps(); syncSliderOnly();
+      st.size=(+sizeRange.value)/100; engagedId=st.id; renderStamps(); syncSliderOnly();
     });
     rotRange.addEventListener('input', function(){
       var st=selectedStamp(); if(!st) return;
-      st.rot=+rotRange.value; renderStamps(); syncSliderOnly();
+      st.rot=+rotRange.value; engagedId=st.id; renderStamps(); syncSliderOnly();
     });
     function syncSliderOnly(){
       var st=selectedStamp(); if(!st) return;
@@ -1070,6 +1072,7 @@
       }
       if(stampEl){
         selectedId=+stampEl.dataset.id;
+        engagedId=selectedId;
         var st2=selectedStamp();
         dragState={type:'move', id:st2.id, startX:p.x, startY:p.y, origX:st2.x, origY:st2.y, moved:false};
         renderStamps();
