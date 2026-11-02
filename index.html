@@ -127,6 +127,7 @@
         background:rgba(20,14,8,.85);color:#ffd34d;font-size:13px;font-weight:800;cursor:pointer;
       }
       .zoom-reset.show{display:block}
+      .mode-hint.gone{display:none}
       .mini-btn.armed{background:#ffe1a8;border-color:#e8813a;color:#7a4416;font-weight:800}
       .ver-badge{position:absolute;left:10px;bottom:10px;z-index:8;font-size:11px;font-weight:700;color:#ffe1a8;background:rgba(20,14,8,.55);padding:3px 8px;border-radius:999px;pointer-events:none}
       .stamp-el{
@@ -368,7 +369,7 @@
         <div id="stampHandle" class="stamp-handle" role="button" aria-label="持ち手：ドラッグでスタンプを動かす"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l-3 3-3-3"/><path d="M19 9l3 3-3 3"/><path d="M2 12h20"/><path d="M12 2v20"/></svg>うごかす</div>
         <div class="detect-spin" id="detectSpin"><span>顔を探しています…</span></div>
       </div>
-      <div id="verBadge" class="ver-badge">ver 1.2.10</div>
+      <div id="verBadge" class="ver-badge">ver 1.2.11</div>
       <button id="zoomReset" class="zoom-reset" type="button">全体表示</button>
     </div>
 
@@ -787,6 +788,7 @@
         if(photoBitmap && photoBitmap.close) photoBitmap.close();
         photoBitmap=bmp; natW=bmp.width; natH=bmp.height;
         canvas.width=natW; canvas.height=natH;
+        $('modeHint').classList.add('gone');
         fitCanvas();
         ctx.drawImage(bmp,0,0);
         stamps=[]; selectedId=null; nextId=1;
@@ -809,13 +811,31 @@
       im.src=url;
     }
     function fitCanvas(keepView){
-      if(keepView){ clampView(); applyView(); } else resetView();
+      var prevW=parseFloat(canvas.style.width)||0;
+      var prevScale=viewScale;
       // canvas CSS: keep inside stage while preserving aspect
       var stageRect=stage.getBoundingClientRect();
       var availW=stageRect.width-24, availH=stageRect.height-16;
       var scale=Math.min(availW/natW, availH/natH);
-      canvas.style.width=(natW*scale)+'px';
-      canvas.style.height=(natH*scale)+'px';
+      var dispW=natW*scale, dispH=natH*scale;
+      canvas.style.width=dispW+'px';
+      canvas.style.height=dispH+'px';
+      if(keepView && prevW>0){
+        // compensate the zoom so the photo keeps its on-screen size
+        viewScale=Math.min(4, Math.max(1, prevScale*prevW/dispW));
+        clampView(); applyView();
+      } else if(!keepView){
+        resetView();
+        if(dispW < availW*0.92){
+          // height-constrained fit would leave the photo tiny: start filled to width
+          viewScale=Math.min(2.5, availW/dispW);
+          viewTx=-(dispW*(viewScale-1))/2;
+          viewTy=-(dispH*(viewScale-1))/2;
+          clampView(); applyView();
+        }
+      } else {
+        clampView(); applyView();
+      }
       positionHandle();
     }
     window.addEventListener('resize', function(){ if(photoBitmap) fitCanvas(true); });
