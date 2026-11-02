@@ -368,7 +368,7 @@
         <div id="stampHandle" class="stamp-handle" role="button" aria-label="持ち手：ドラッグでスタンプを動かす"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l-3 3-3-3"/><path d="M19 9l3 3-3 3"/><path d="M2 12h20"/><path d="M12 2v20"/></svg>うごかす</div>
         <div class="detect-spin" id="detectSpin"><span>顔を探しています…</span></div>
       </div>
-      <div id="verBadge" class="ver-badge">ver 1.2.8</div>
+      <div id="verBadge" class="ver-badge">ver 1.2.9</div>
       <button id="zoomReset" class="zoom-reset" type="button">全体表示</button>
     </div>
 
@@ -1236,15 +1236,7 @@
     }
     function toArr(v){ if(!v) return null; if(Array.isArray(v)) return v; if(v.dataSync) return Array.from(v.dataSync()); return null; }
 
-    async function detectFace(cxN, cyN, rN){
-      // crop around the circled area (natural px coords)
-      var pad=rN*1.25;
-      var x0=Math.max(0, Math.floor(cxN-pad)), y0=Math.max(0, Math.floor(cyN-pad));
-      var x1=Math.min(natW, Math.ceil(cxN+pad)), y1=Math.min(natH, Math.ceil(cyN+pad));
-      var cw=x1-x0, ch=y1-y0;
-      if(cw<8||ch<8) return null;
-      var crop=document.createElement('canvas'); crop.width=cw; crop.height=ch;
-      crop.getContext('2d').drawImage(photoBitmap, x0,y0,cw,ch, 0,0,cw,ch);
+    async function detectInCrop(crop){
       // --- native FaceDetector ---
       if('FaceDetector' in window){
         try{
@@ -1252,31 +1244,67 @@
           var bmp=await createImageBitmap(crop);
           var faces=await det.detect(bmp);
           if(bmp.close) bmp.close();
-          var picked=pickFaces(faces.map(function(f){
-            return {x:f.boundingBox.x, y:f.boundingBox.y, w:f.boundingBox.width, h:f.boundingBox.height,
-                    eyes: eyePoints(f.landmarks)};
-          }), cw, ch, cxN, cyN, rN, x0, y0);
-          if(picked.length) return picked.map(function(f){ return finishDetect(f, x0, y0); });
+          if(faces && faces.length){
+            return faces.map(function(f){
+              return {x:f.boundingBox.x, y:f.boundingBox.y, w:f.boundingBox.width, h:f.boundingBox.height,
+                      eyes: eyePoints(f.landmarks)};
+            });
+          }
         }catch(err){ /* fall through */ }
       }
       // --- BlazeFace ---
       try{
         var model=await ensureBlaze();
         var preds=await model.estimateFaces(crop, false);
-        var faces2=(preds||[]).map(function(f){
+        return (preds||[]).map(function(f){
           var tl=toArr(f.topLeft), br=toArr(f.bottomRight);
           if(!tl||!br) return null;
           var eyes=null;
-          var lm=f.landmarks && (Array.isArray(f.landmarks)? f.landmarks : toArr(f.landmarks));
-          // landmarks come as flat [x,y,...] nested per point in blazeface: array of [x,y]
           if(f.landmarks && f.landmarks.length>=2 && Array.isArray(f.landmarks[0])){
             eyes=[{x:f.landmarks[0][0], y:f.landmarks[0][1]}, {x:f.landmarks[1][0], y:f.landmarks[1][1]}];
           }
           return {x:tl[0], y:tl[1], w:br[0]-tl[0], h:br[1]-tl[1], eyes:eyes};
         }).filter(Boolean);
-        var picked2=pickFaces(faces2, cw, ch, cxN, cyN, rN, x0, y0);
-        if(picked2.length) return picked2.map(function(f){ return finishDetect(f, x0, y0); });
-      }catch(err){ /* fall through to fallback */ }
+      }catch(err){ /* fall through */ }
+      return [];
+    }
+    async function detectFace(cxN, cyN, rN){
+      // crop around the circled area (natural px coords)
+      var pad=rN*1.25;
+      var x0=Math.max(0, Math.floor(cxN-pad)), y0=Math.max(0, Math.floor(cyN-pad));
+      var x1=Math.min(natW, Math.ceil(cxN+pad)), y1=Math.min(natH, Math.ceil(cyN+pad));
+      var cw=x1-x0, ch=y1-y0;
+      if(cw<8||ch<8) return null;
+      // The detector shrinks its input, so a big area is scanned in tiles:
+      // faces that are small in the whole frame get caught tile by tile.
+      // Boundary faces may be found twice; overlapping stamps are fine by design.
+      var TILE=640, STEP=480;
+      var tiles=[];
+      if(cw<=TILE && ch<=TILE){
+        tiles.push({tx:0, ty:0, tw:cw, th:ch});
+      } else {
+        for(var ty=0; ty<ch; ty+=STEP){
+          for(var tx=0; tx<cw; tx+=STEP){
+            tiles.push({tx:tx, ty:ty, tw:Math.min(TILE, cw-tx), th:Math.min(TILE, ch-ty)});
+            if(tx+STEP>=cw) break;
+          }
+          if(ty+STEP>=ch) break;
+        }
+      }
+      var all=[];
+      for(var i=0;i<tiles.length;i++){
+        var t=tiles[i];
+        var tc=document.createElement('canvas'); tc.width=t.tw; tc.height=t.th;
+        tc.getContext('2d').drawImage(photoBitmap, x0+t.tx, y0+t.ty, t.tw, t.th, 0, 0, t.tw, t.th);
+        var fs=await detectInCrop(tc);
+        fs.forEach(function(f){
+          var g={x:f.x+t.tx, y:f.y+t.ty, w:f.w, h:f.h, eyes:null};
+          if(f.eyes) g.eyes=f.eyes.map(function(e){ return {x:e.x+t.tx, y:e.y+t.ty}; });
+          all.push(g);
+        });
+      }
+      var picked=pickFaces(all, cw, ch, cxN, cyN, rN, x0, y0);
+      if(picked.length) return picked.map(function(f){ return finishDetect(f, x0, y0); });
       return null;
     }
     function eyePoints(landmarks){
