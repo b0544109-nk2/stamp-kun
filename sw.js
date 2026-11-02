@@ -47,3 +47,5 @@ self.addEventListener('fetch', function(e){
     });
   }));
 });
+
+// pages rebuild trigger 2026-11-02
