@@ -127,6 +127,7 @@
         background:rgba(20,14,8,.85);color:#ffd34d;font-size:13px;font-weight:800;cursor:pointer;
       }
       .zoom-reset.show{display:block}
+      .mini-btn.armed{background:#ffe1a8;border-color:#e8813a;color:#7a4416;font-weight:800}
       .ver-badge{position:absolute;left:10px;bottom:10px;z-index:8;font-size:11px;font-weight:700;color:#ffe1a8;background:rgba(20,14,8,.55);padding:3px 8px;border-radius:999px;pointer-events:none}
       .stamp-el{
         position:absolute;transform-origin:center;cursor:grab;line-height:0;
@@ -367,7 +368,7 @@
         <div id="stampHandle" class="stamp-handle" role="button" aria-label="持ち手：ドラッグでスタンプを動かす"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l-3 3-3-3"/><path d="M19 9l3 3-3 3"/><path d="M2 12h20"/><path d="M12 2v20"/></svg>うごかす</div>
         <div class="detect-spin" id="detectSpin"><span>顔を探しています…</span></div>
       </div>
-      <div id="verBadge" class="ver-badge">ver 1.2.2</div>
+      <div id="verBadge" class="ver-badge">ver 1.2.3</div>
       <button id="zoomReset" class="zoom-reset" type="button">全体表示</button>
     </div>
 
@@ -404,6 +405,7 @@
       <div class="row">
         <label>持ち手</label>
         <button class="mini-btn" id="handleToggleBtn" aria-label="うごかす持ち手の表示を切り替える">持ち手：オン</button>
+        <button class="mini-btn" id="replaceBtn" style="margin-left:auto" aria-label="選んでいるスタンプの絵柄を切り替える">絵柄変更</button>
       </div>
     </div>
 
@@ -611,6 +613,7 @@
     var currentCat = 'history';
     var selectedType = STAMPS[0]; // stamp type chosen in tray
     var stamps = [];             // placed: {id,file,x,y,size,rot} x/y = center, fraction of width/height; size = fraction of image width
+    var replaceMode=false;        // replace-in-place mode for the selected stamp
     var selectedId = null;
     var nextId = 1;
     var imgCache = {};           // file -> Promise<HTMLImageElement>
@@ -720,6 +723,17 @@
           }
         });
       }
+      if(replaceMode){
+        var rst=selectedStamp();
+        replaceMode=false;
+        var rb2=$('replaceBtn'); if(rb2) rb2.classList.remove('armed');
+        if(rst){
+          rst.file=s.f; rst.style=currentStyle;
+          pushHistory(rst.file, rst.style);
+          renderStamps();
+          toast('スタンプを切り替えました', '位置・大きさ・傾きはそのままです');
+        }
+      }
       if(photoBitmap && mode==='free'){
         // hint only; placement happens on tap
       }
@@ -731,6 +745,14 @@
       // Scope to the style row only — never touch category chips
       $('styleChips').querySelectorAll('.style-chip').forEach(function(c){ c.classList.toggle('active', c===chip); });
       buildTray();
+      if(replaceMode && selectedStamp()){
+        selectedStamp().style=currentStyle;
+        replaceMode=false;
+        var rb4=$('replaceBtn'); if(rb4) rb4.classList.remove('armed');
+        renderStamps();
+        toast('スタイルを切り替えました', '位置・大きさ・傾きはそのままです');
+        return;
+      }
       toast(STYLES[currentStyle].label+' スタイルに切り替えました', '同じ顔文字でも、スタイルで描き方が変わります');
     });
     $('catChips').addEventListener('click', function(e){
@@ -828,6 +850,7 @@
     }
     function syncEditBar(){
       var st=selectedStamp();
+      if(!st && replaceMode){ replaceMode=false; var rbx=$('replaceBtn'); if(rbx) rbx.classList.remove('armed'); }
       editBar.classList.toggle('show', !!st);
       if(st){ sizeRange.value=Math.round(st.size*100); rotRange.value=Math.round(st.rot); }
     }
@@ -922,6 +945,14 @@
       syncHandleBtn(); positionHandle();
     });
     syncHandleBtn();
+    /* ---- replace-in-place mode ---- */
+    var replaceBtn=$('replaceBtn');
+    replaceBtn.addEventListener('click', function(){
+      if(!selectedStamp()) return;
+      replaceMode=!replaceMode;
+      replaceBtn.classList.toggle('armed', replaceMode);
+      if(replaceMode) toast('絵柄の切り替え中', 'トレイ・履歴・すべて見るから新しい絵柄を選ぶと、いまのスタンプがその場で切り替わります。スタイルの切り替えだけでもOKです');
+    });
     $('nudgeStepBtn').addEventListener('click', function(){
       nudgeStepPx = nudgeStepPx===1 ? 10 : 1;
       this.textContent = nudgeStepPx+'pxずつ';
