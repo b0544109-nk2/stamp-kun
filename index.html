@@ -367,7 +367,7 @@
         <div id="stampHandle" class="stamp-handle" role="button" aria-label="持ち手：ドラッグでスタンプを動かす"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l-3 3-3-3"/><path d="M19 9l3 3-3 3"/><path d="M2 12h20"/><path d="M12 2v20"/></svg>うごかす</div>
         <div class="detect-spin" id="detectSpin"><span>顔を探しています…</span></div>
       </div>
-      <div id="verBadge" class="ver-badge">ver 1.2.1</div>
+      <div id="verBadge" class="ver-badge">ver 1.2.2</div>
       <button id="zoomReset" class="zoom-reset" type="button">全体表示</button>
     </div>
 
@@ -1175,15 +1175,15 @@
       // --- native FaceDetector ---
       if('FaceDetector' in window){
         try{
-          var det=new FaceDetector({fastMode:true, maxDetectedFaces:5});
+          var det=new FaceDetector({fastMode:true, maxDetectedFaces:10});
           var bmp=await createImageBitmap(crop);
           var faces=await det.detect(bmp);
           if(bmp.close) bmp.close();
-          var best=pickFace(faces.map(function(f){
+          var picked=pickFaces(faces.map(function(f){
             return {x:f.boundingBox.x, y:f.boundingBox.y, w:f.boundingBox.width, h:f.boundingBox.height,
                     eyes: eyePoints(f.landmarks)};
-          }), cw, ch);
-          if(best) return finishDetect(best, x0, y0);
+          }), cw, ch, cxN, cyN, rN, x0, y0);
+          if(picked.length) return picked.map(function(f){ return finishDetect(f, x0, y0); });
         }catch(err){ /* fall through */ }
       }
       // --- BlazeFace ---
@@ -1201,8 +1201,8 @@
           }
           return {x:tl[0], y:tl[1], w:br[0]-tl[0], h:br[1]-tl[1], eyes:eyes};
         }).filter(Boolean);
-        var best2=pickFace(faces2, cw, ch);
-        if(best2) return finishDetect(best2, x0, y0);
+        var picked2=pickFaces(faces2, cw, ch, cxN, cyN, rN, x0, y0);
+        if(picked2.length) return picked2.map(function(f){ return finishDetect(f, x0, y0); });
       }catch(err){ /* fall through to fallback */ }
       return null;
     }
@@ -1214,15 +1214,20 @@
       });
       return eyes.length>=2 ? eyes.slice(0,2) : null;
     }
-    function pickFace(faces, cw, ch){
-      if(!faces.length) return null;
+    function pickFaces(faces, cw, ch, cxN, cyN, rN, x0, y0){
+      if(!faces.length) return [];
+      var inside=faces.filter(function(f){
+        var fx=x0+f.x+f.w/2, fy=y0+f.y+f.h/2;
+        return Math.hypot(fx-cxN, fy-cyN) <= rN*1.05;
+      });
+      if(inside.length) return inside;
       var ccx=cw/2, ccy=ch/2, best=null, bestScore=1e18;
       faces.forEach(function(f){
         var fx=f.x+f.w/2, fy=f.y+f.h/2;
         var d=Math.hypot(fx-ccx, fy-ccy) - Math.min(f.w,f.h)*.35;
         if(d<bestScore){ bestScore=d; best=f; }
       });
-      return best;
+      return best ? [best] : [];
     }
     function finishDetect(f, x0, y0){
       var angle=0;
@@ -1240,13 +1245,16 @@
     async function autoStamp(circle){
       detectSpin.classList.add('show');
       var cxN=circle.cx*natW, cyN=circle.cy*natH, rN=circle.r*natW;
-      var found=null;
-      try{ found=await detectFace(cxN, cyN, rN); }catch(e){ found=null; }
+      var found=[];
+      try{ found=await detectFace(cxN, cyN, rN) || []; }catch(e){ found=[]; }
       detectSpin.classList.remove('show');
-      if(found){
-        addStamp(selectedType.f, clamp01(found.cx), clamp01(found.cy),
-                 Math.min(.85, Math.max(.03, found.size * styleScale())), Math.round(found.angle*10)/10);
-        toast('顔を検知して貼りました', '大きさと傾きは自動調整済み。ドラッグやスライダーで微調整できます');
+      if(found.length){
+        found.forEach(function(fd){
+          addStamp(selectedType.f, clamp01(fd.cx), clamp01(fd.cy),
+                   Math.min(.85, Math.max(.03, fd.size * styleScale())), Math.round(fd.angle*10)/10);
+        });
+        if(found.length>=2) toast(found.length+'人の顔を検知して貼りました', 'それぞれ個別に動かしたり、大きさや傾きを変えたりできます');
+        else toast('顔を検知して貼りました', '大きさと傾きは自動調整済み。ドラッグやスライダーで微調整できます');
       } else {
         addStamp(selectedType.f, clamp01(circle.cx), clamp01(circle.cy),
                  Math.min(.85, Math.max(.03, circle.r*2*1.05 * styleScale())), 0);
