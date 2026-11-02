@@ -368,7 +368,7 @@
         <div id="stampHandle" class="stamp-handle" role="button" aria-label="持ち手：ドラッグでスタンプを動かす"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l-3 3-3-3"/><path d="M19 9l3 3-3 3"/><path d="M2 12h20"/><path d="M12 2v20"/></svg>うごかす</div>
         <div class="detect-spin" id="detectSpin"><span>顔を探しています…</span></div>
       </div>
-      <div id="verBadge" class="ver-badge">ver 1.2.5</div>
+      <div id="verBadge" class="ver-badge">ver 1.2.6</div>
       <button id="zoomReset" class="zoom-reset" type="button">全体表示</button>
     </div>
 
@@ -659,6 +659,9 @@
     document.addEventListener('touchmove', function(e){
       if(e.touches && e.touches.length>1 && !(stage && stage.contains(e.target))) e.preventDefault();
     }, {passive:false});
+    document.addEventListener('touchstart', function(e){
+      if(e.touches && e.touches.length>1 && !(stage && stage.contains(e.target))) e.preventDefault();
+    }, {passive:false});
 
     /* =============== tray =============== */
     function buildTray(){
@@ -805,8 +808,8 @@
       im.onerror=function(){ toast('写真を読み込めませんでした'); };
       im.src=url;
     }
-    function fitCanvas(){
-      resetView();
+    function fitCanvas(keepView){
+      if(keepView){ clampView(); applyView(); } else resetView();
       // canvas CSS: keep inside stage while preserving aspect
       var stageRect=stage.getBoundingClientRect();
       var availW=stageRect.width-24, availH=stageRect.height-16;
@@ -815,7 +818,16 @@
       canvas.style.height=(natH*scale)+'px';
       positionHandle();
     }
-    window.addEventListener('resize', function(){ if(photoBitmap) fitCanvas(); });
+    window.addEventListener('resize', function(){ if(photoBitmap) fitCanvas(true); });
+    if('ResizeObserver' in window){
+      var lastStageW=0, lastStageH=0;
+      new ResizeObserver(function(){
+        var w=stage.clientWidth, h=stage.clientHeight;
+        if(w===lastStageW && h===lastStageH) return;
+        lastStageW=w; lastStageH=h;
+        if(photoBitmap) fitCanvas(true);
+      }).observe(stage);
+    }
     if(window.ResizeObserver){
       new ResizeObserver(function(){ if(photoBitmap) fitCanvas(); }).observe(stage);
     }
@@ -829,23 +841,36 @@
       for(var i=0;i<stamps.length;i++) if(stamps[i].id===selectedId) return stamps[i];
       return null;
     }
+    var stampEls={};
     function renderStamps(popId){
-      wrap.querySelectorAll('.stamp-el').forEach(function(el){ el.remove(); });
+      var seen={};
       stamps.forEach(function(st){
+        seen[st.id]=1;
         var s=stampByFile(st.file);
-        var el=document.createElement('div');
-        el.className='stamp-el'+(st.id===selectedId?' selected':'')+(st.id===popId?' pop':'');
-        el.dataset.id=st.id;
+        var el=stampEls[st.id];
+        if(!el){
+          el=document.createElement('div');
+          el.dataset.id=st.id;
+          el.style.aspectRatio='1';
+          var nim=document.createElement('img');
+          nim.alt=s.c; nim.draggable=false;
+          el.appendChild(nim);
+          stampEls[st.id]=el;
+          wrap.appendChild(el);
+        }
+        var url=stampUrl(s, st.style);
+        var imEl=el.firstChild;
+        if(imEl.getAttribute('src')!==url) imEl.src=url;
         el.style.left=(st.x*100)+'%';
         el.style.top=(st.y*100)+'%';
         el.style.width=(st.size*100)+'%';
-        el.style.aspectRatio='1';
         el.style.transform='translate(-50%,-50%) rotate('+st.rot+'deg)';
         el.style.zIndex = st.id===selectedId ? 4 : 2;
-        var im=document.createElement('img');
-        im.src=stampUrl(s, st.style); im.alt=s.c; im.draggable=false;
-        el.appendChild(im);
-        wrap.appendChild(el);
+        var cls='stamp-el'+(st.id===selectedId?' selected':'')+(st.id===popId?' pop':'');
+        if(el.className!==cls) el.className=cls;
+      });
+      Object.keys(stampEls).forEach(function(id){
+        if(!seen[id]){ stampEls[id].remove(); delete stampEls[id]; }
       });
       updateUI();
       syncEditBar();
@@ -1159,6 +1184,12 @@
     }
     wrap.addEventListener('pointerup', endPointer);
     wrap.addEventListener('pointercancel', function(e){ pointers.delete(e.pointerId); pinchState=null; viewPinch=null; dragState=null; circleOverlay.style.display='none'; });
+    function resetGestures(){
+      pointers.clear(); pinchState=null; viewPinch=null; dragState=null;
+      circleOverlay.style.display='none';
+    }
+    window.addEventListener('pointercancel', resetGestures);
+    document.addEventListener('visibilitychange', function(){ if(document.hidden) resetGestures(); });
     function clamp01(v){ return Math.min(.97, Math.max(.03, v)); }
     function syncEditBarValues(st){
       sizeRange.value=Math.round(st.size*100);
