@@ -1,0 +1,13 @@
+{
+  "name": "スタンプくんっ🤠 by nk2",
+  "short_name": "スタンプくんっ",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#2b2118",
+  "theme_color": "#2b2118",
+  "icons": [
+    {"src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"},
+    {"src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable"}
+  ]
+}
