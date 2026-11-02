@@ -368,7 +368,7 @@
         <div id="stampHandle" class="stamp-handle" role="button" aria-label="持ち手：ドラッグでスタンプを動かす"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l-3 3-3-3"/><path d="M19 9l3 3-3 3"/><path d="M2 12h20"/><path d="M12 2v20"/></svg>うごかす</div>
         <div class="detect-spin" id="detectSpin"><span>顔を探しています…</span></div>
       </div>
-      <div id="verBadge" class="ver-badge">ver 1.2.6</div>
+      <div id="verBadge" class="ver-badge">ver 1.2.7</div>
       <button id="zoomReset" class="zoom-reset" type="button">全体表示</button>
     </div>
 
@@ -1287,13 +1287,26 @@
       });
       return eyes.length>=2 ? eyes.slice(0,2) : null;
     }
+    function dedupeFaces(faces){
+      var sorted=faces.slice().sort(function(a,b){ return (b.w*b.h)-(a.w*a.h); });
+      var kept=[];
+      sorted.forEach(function(f){
+        var fx=f.x+f.w/2, fy=f.y+f.h/2;
+        var dup=kept.some(function(k){
+          var kx=k.x+k.w/2, ky=k.y+k.h/2;
+          return Math.hypot(fx-kx, fy-ky) < Math.min(f.w, f.h, k.w, k.h)*0.5;
+        });
+        if(!dup) kept.push(f);
+      });
+      return kept;
+    }
     function pickFaces(faces, cw, ch, cxN, cyN, rN, x0, y0){
       if(!faces.length) return [];
       var inside=faces.filter(function(f){
         var fx=x0+f.x+f.w/2, fy=y0+f.y+f.h/2;
         return Math.hypot(fx-cxN, fy-cyN) <= rN*1.05;
       });
-      if(inside.length) return inside;
+      if(inside.length) return dedupeFaces(inside);
       var ccx=cw/2, ccy=ch/2, best=null, bestScore=1e18;
       faces.forEach(function(f){
         var fx=f.x+f.w/2, fy=f.y+f.h/2;
