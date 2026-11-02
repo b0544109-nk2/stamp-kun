@@ -119,6 +119,14 @@
       }
       #photoCanvas{display:block;max-width:100%;max-height:100%;border-radius:10px}
       #photoWrap.no-photo{display:none}
+      #photoWrap{transform-origin:0 0}
+      #photoWrap.anim{transition:transform .25s ease}
+      .zoom-reset{
+        position:absolute;right:12px;bottom:12px;z-index:9;display:none;
+        padding:9px 14px;border-radius:999px;border:2.5px solid #d97706;
+        background:rgba(20,14,8,.85);color:#ffd34d;font-size:13px;font-weight:800;cursor:pointer;
+      }
+      .zoom-reset.show{display:block}
       .stamp-el{
         position:absolute;transform-origin:center;cursor:grab;line-height:0;
         filter:drop-shadow(0 2px 5px rgba(0,0,0,.25));
@@ -358,6 +366,7 @@
         <div id="stampHandle" class="stamp-handle" role="button" aria-label="持ち手：ドラッグでスタンプを動かす"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l-3 3-3-3"/><path d="M19 9l3 3-3 3"/><path d="M2 12h20"/><path d="M12 2v20"/></svg>うごかす</div>
         <div class="detect-spin" id="detectSpin"><span>顔を探しています…</span></div>
       </div>
+      <button id="zoomReset" class="zoom-reset" type="button">全体表示</button>
     </div>
 
     <div class="privacy-note">写真はこの端末の中だけで処理されます。外部に送信されることはありません。</div>
@@ -759,6 +768,7 @@
       im.src=url;
     }
     function fitCanvas(){
+      resetView();
       // canvas CSS: keep inside stage while preserving aspect
       var stageRect=stage.getBoundingClientRect();
       var availW=stageRect.width-24, availH=stageRect.height-16;
@@ -819,13 +829,16 @@
     function positionHandle(){
       var st=selectedStamp();
       if(!st || !photoBitmap){ stampHandleEl.classList.remove('show'); stampHandleEl.classList.remove('above'); return; }
+      if(stampHandleEl.parentNode!==stage) stage.appendChild(stampHandleEl);
+      var sr=stage.getBoundingClientRect();
       var r=wrap.getBoundingClientRect();
       if(!r.width){ stampHandleEl.classList.remove('show'); return; }
+      var baseX=r.left-sr.left, baseY=r.top-sr.top;
       var halfPx=st.size*r.width/2;
-      var cxPx=Math.min(r.width, Math.max(0, st.x*r.width));
-      var cyPx=st.y*r.height + halfPx + 26;
+      var cxPx=Math.min(sr.width-8, Math.max(8, baseX + st.x*r.width));
+      var cyPx=baseY + st.y*r.height + halfPx + 26;
       var above=false;
-      if(cyPx > r.height + 4){ cyPx=st.y*r.height - halfPx - 26; above=true; }
+      if(cyPx > baseY + r.height + 4){ cyPx=baseY + st.y*r.height - halfPx - 26; above=true; }
       stampHandleEl.style.left=cxPx+'px';
       stampHandleEl.style.top=cyPx+'px';
       stampHandleEl.classList.toggle('above', above);
@@ -914,7 +927,7 @@
 
     /* =============== mode switch =============== */
     var HINTS={
-      free:'スタンプを選んで、写真をタップすると貼れます。貼ったスタンプはドラッグ移動、2本指で拡大・回転。選択中のスタンプは、本体の下に出る「うごかす」持ち手や、下の矢印ボタンでも動かせます。',
+      free:'スタンプを選んで、写真をタップすると貼れます。貼ったスタンプはドラッグ移動、2本指で拡大・回転。選択中のスタンプは、本体の下に出る「うごかす」持ち手や、下の矢印ボタンでも動かせます。写真の上をピンチすると拡大表示もできます。',
       auto:'隠したい顔を、指でドラッグして丸く囲んでください。その範囲の顔を検知して、大きさと傾きを自動で合わせます。'
     };
     function setMode(m){
@@ -930,6 +943,29 @@
     $('modeAuto').addEventListener('click', function(){ setMode('auto'); });
 
     /* =============== pointer interaction =============== */
+    /* ---- photo view zoom: display-only transform on #photoWrap ---- */
+    var viewScale=1, viewTx=0, viewTy=0, viewPinch=null;
+    var zoomResetBtn=$('zoomReset');
+    function applyView(){
+      wrap.style.transform=(viewScale===1 && !viewTx && !viewTy) ? '' : 'translate('+viewTx+'px,'+viewTy+'px) scale('+viewScale+')';
+      var show=viewScale>1.02;
+      zoomResetBtn.classList.toggle('show', show);
+      if(show) zoomResetBtn.textContent='全体表示 '+Math.round(viewScale*100)+'%';
+      positionHandle();
+    }
+    function clampView(){
+      if(viewScale<=1){ viewTx=0; viewTy=0; return; }
+      var r=wrap.getBoundingClientRect();
+      var W0=r.width/viewScale, H0=r.height/viewScale;
+      viewTx=Math.min(0, Math.max((1-viewScale)*W0, viewTx));
+      viewTy=Math.min(0, Math.max((1-viewScale)*H0, viewTy));
+    }
+    function resetView(){ viewScale=1; viewTx=0; viewTy=0; applyView(); }
+    zoomResetBtn.addEventListener('click', function(){
+      wrap.classList.add('anim'); resetView();
+      setTimeout(function(){ wrap.classList.remove('anim'); }, 280);
+    });
+
     var pointers=new Map(); // pointerId -> {cx,cy, targetId}
     var dragState=null;     // {type:'move'|'circle'|'bg', ...}
     var pinchState=null;
@@ -938,7 +974,7 @@
       var r=wrap.getBoundingClientRect();
       return { x:(clientX-r.left)/r.width, y:(clientY-r.top)/r.height, px:clientX-r.left, py:clientY-r.top, rw:r.width, rh:r.height };
     }
-    wrap.addEventListener('pointerdown', function(e){
+    function onPointerDown(e){
       if(!photoBitmap) return;
       e.preventDefault();
       wrap.setPointerCapture(e.pointerId);
@@ -959,6 +995,14 @@
           renderStamps();
           return;
         }
+        else {
+          var midX=(pts[0].cx+pts[1].cx)/2, midY=(pts[0].cy+pts[1].cy)/2;
+          var mp=wrapPoint(midX, midY);
+          viewPinch={d0:Math.hypot(pts[0].cx-pts[1].cx, pts[0].cy-pts[1].cy)||1, s0:viewScale, qx:mp.px/viewScale, qy:mp.py/viewScale};
+          dragState=null;
+          circleOverlay.style.display='none';
+          return;
+        }
       }
       if(onHandle && selectedStamp()){
         // drag via the external handle: the finger stays below the stamp, never covering it
@@ -975,13 +1019,31 @@
         dragState={type:'circle', startPx:p.px, startPy:p.py, curPx:p.px, curPy:p.py};
         drawCircleOverlay();
       } else {
-        dragState={type:'bg', startX:p.x, startY:p.y, moved:false};
+        dragState={type:'bg', startX:p.x, startY:p.y, moved:false, startCx:e.clientX, startCy:e.clientY, lastCx:e.clientX, lastCy:e.clientY};
       }
+    }
+    wrap.addEventListener('pointerdown', onPointerDown);
+    stampHandleEl.addEventListener('pointerdown', onPointerDown);
+    wrap.addEventListener('dblclick', function(){
+      if(viewScale>1){ wrap.classList.add('anim'); resetView(); setTimeout(function(){ wrap.classList.remove('anim'); }, 280); }
     });
     wrap.addEventListener('pointermove', function(e){
       if(!pointers.has(e.pointerId)) return;
       var rec=pointers.get(e.pointerId); rec.cx=e.clientX; rec.cy=e.clientY;
       var p=wrapPoint(e.clientX,e.clientY);
+      if(viewPinch && pointers.size>=2){
+        var vpts=[...pointers.values()];
+        var vd=Math.hypot(vpts[0].cx-vpts[1].cx, vpts[0].cy-vpts[1].cy)||1;
+        var s2=Math.min(4, Math.max(1, viewPinch.s0 * vd/viewPinch.d0));
+        var midX2=(vpts[0].cx+vpts[1].cx)/2, midY2=(vpts[0].cy+vpts[1].cy)/2;
+        var rr=wrap.getBoundingClientRect();
+        var orgX=rr.left-viewTx, orgY=rr.top-viewTy;
+        viewScale=s2;
+        viewTx=midX2-orgX-s2*viewPinch.qx;
+        viewTy=midY2-orgY-s2*viewPinch.qy;
+        clampView(); applyView();
+        return;
+      }
       if(pinchState && pointers.size>=2){
         var pts=[...pointers.values()];
         var dx=pts[0].cx-pts[1].cx, dy=pts[0].cy-pts[1].cy;
@@ -1007,19 +1069,25 @@
         dragState.curPx=p.px; dragState.curPy=p.py;
         drawCircleOverlay();
       } else if(dragState.type==='bg'){
-        if(Math.abs(p.x-dragState.startX)+Math.abs(p.y-dragState.startY)>.01) dragState.moved=true;
+        var movedPx=Math.abs(e.clientX-dragState.startCx)+Math.abs(e.clientY-dragState.startCy);
+        if(viewScale>1){
+          viewTx+=e.clientX-dragState.lastCx; viewTy+=e.clientY-dragState.lastCy;
+          dragState.lastCx=e.clientX; dragState.lastCy=e.clientY;
+          clampView(); applyView();
+        }
+        if(movedPx>8) dragState.moved=true;
       }
     });
     function endPointer(e){
       pointers.delete(e.pointerId);
-      if(pointers.size<2) pinchState=null;
+      if(pointers.size<2){ pinchState=null; viewPinch=null; }
       if(!dragState) return;
       var p=wrapPoint(e.clientX,e.clientY);
       if(dragState.type==='bg'){
         if(!dragState.moved){
           // tap on photo in free mode -> place selected stamp
           addStamp(selectedType.f, clamp01(p.x), clamp01(p.y), .20 * styleScale(), 0);
-        } else if(selectedId!=null){
+        } else if(selectedId!=null && viewScale<=1){
           selectedId=null; renderStamps();
         }
       } else if(dragState.type==='circle'){
@@ -1030,7 +1098,7 @@
       dragState=null;
     }
     wrap.addEventListener('pointerup', endPointer);
-    wrap.addEventListener('pointercancel', function(e){ pointers.delete(e.pointerId); pinchState=null; dragState=null; circleOverlay.style.display='none'; });
+    wrap.addEventListener('pointercancel', function(e){ pointers.delete(e.pointerId); pinchState=null; viewPinch=null; dragState=null; circleOverlay.style.display='none'; });
     function clamp01(v){ return Math.min(.97, Math.max(.03, v)); }
     function syncEditBarValues(st){
       sizeRange.value=Math.round(st.size*100);
