@@ -190,6 +190,10 @@
       }
       .editbar.show{display:flex}
       .editbar .row{display:flex;align-items:center;gap:10px}
+      .editbar .sliders-row{flex-wrap:wrap}
+      .slider-group{display:flex;align-items:center;gap:10px;flex:1 1 150px;min-width:0}
+      .slider-group input[type=range]{flex:1;min-width:0}
+      .slider-actions{display:flex;gap:8px;align-items:center;flex:none}
       .editbar label{font-size:12px;font-weight:700;color:var(--ink-soft);width:40px;flex:none}
       .editbar input[type=range]{flex:1;accent-color:var(--accent-strong);height:28px}
       .mini-btn{
@@ -292,20 +296,17 @@
       html[data-ui="b"] .chip, html[data-ui="c"] .chip{padding:5px 8px;font-size:11.5px}
       html[data-ui="b"] .stamp-cell, html[data-ui="c"] .stamp-cell{width:48px;height:48px}
       html[data-ui="b"] .history-empty, html[data-ui="c"] .history-empty{min-height:48px}
-      /* pattern B: edit bar in two rows (size+tilt+dup+del / position+handle+replace) */
-      html[data-ui="b"] .editbar{flex-direction:row;flex-wrap:wrap;align-items:center;column-gap:8px}
-      html[data-ui="b"] .editbar .row{display:contents}
-      html[data-ui="b"] .editbar input[type=range]{flex:1 1 56px;min-width:48px}
-      html[data-ui="b"] .editbar label{width:30px}
-      html[data-ui="b"] .editbar .row:nth-of-type(4) label{display:none}
-      html[data-ui="b"] .nudge-btn{width:31px;height:30px}
-      html[data-ui="b"] .nudge-pad{gap:4px}
-      html[data-ui="b"] #nudgeStepBtn{padding:5px 7px;font-size:10.5px}
       html[data-ui="c"] .editbar{
         position:fixed;left:8px;right:8px;z-index:40;
         bottom:calc(132px + env(safe-area-inset-bottom));
         border:1.5px solid var(--line);border-radius:16px;box-shadow:var(--shadow);
       }
+      /* pattern B/C: labels above the sliders; step toggle omitted */
+      html[data-ui="b"] .slider-group, html[data-ui="c"] .slider-group{flex-direction:column;align-items:stretch;gap:0}
+      html[data-ui="b"] .slider-group label, html[data-ui="c"] .slider-group label{width:auto;margin-bottom:2px}
+      html[data-ui="b"] #nudgeStepBtn, html[data-ui="c"] #nudgeStepBtn{display:none}
+      html[data-ui="b"] .nudge-btn, html[data-ui="c"] .nudge-btn{width:31px;height:30px}
+      html[data-ui="b"] .nudge-pad, html[data-ui="c"] .nudge-pad{gap:4px}
       /* ---------- toast ---------- */
       .toast{
         position:fixed;left:50%;bottom:190px;transform:translate(-50%,20px);
@@ -400,7 +401,7 @@
         <div id="stampHandle" class="stamp-handle" role="button" aria-label="持ち手：ドラッグでスタンプを動かす"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l-3 3-3-3"/><path d="M19 9l3 3-3 3"/><path d="M2 12h20"/><path d="M12 2v20"/></svg>うごかす</div>
         <div class="detect-spin" id="detectSpin"><span>顔を探しています…</span></div>
       </div>
-      <div id="verBadge" class="ver-badge">ver 1.2.13</div>
+      <div id="verBadge" class="ver-badge">ver 1.2.14</div>
       <button id="zoomReset" class="zoom-reset" type="button">全体表示</button>
     </div>
 
@@ -408,21 +409,25 @@
 
     <!-- edit bar -->
     <div class="editbar" id="editBar">
-      <div class="row">
-        <label for="sizeRange">大きさ</label>
-        <input type="range" id="sizeRange" min="2" max="70" step="1" />
-      </div>
-      <div class="row">
-        <label for="rotRange">傾き</label>
-        <input type="range" id="rotRange" min="-60" max="60" step="1" />
-        <button class="mini-btn" id="dupBtn">
+      <div class="row sliders-row">
+        <div class="slider-group">
+          <label for="sizeRange">大きさ</label>
+          <input type="range" id="sizeRange" min="2" max="70" step="1" />
+        </div>
+        <div class="slider-group">
+          <label for="rotRange">傾き</label>
+          <input type="range" id="rotRange" min="-60" max="60" step="1" />
+        </div>
+        <div class="slider-actions">
+          <button class="mini-btn" id="dupBtn">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
           複製
         </button>
-        <button class="mini-btn danger" id="delBtn">
+          <button class="mini-btn danger" id="delBtn">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
           削除
         </button>
+        </div>
       </div>
       <div class="row">
         <label>位置</label>
@@ -433,9 +438,6 @@
           <button class="nudge-btn" data-dx="1" data-dy="0" aria-label="右へ動かす"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button>
         </div>
         <button class="mini-btn" id="nudgeStepBtn" aria-label="1回で動く量を切り替える">1pxずつ</button>
-      </div>
-      <div class="row">
-        <label>持ち手</label>
         <button class="mini-btn" id="handleToggleBtn" aria-label="うごかす持ち手の表示を切り替える">持ち手：オン</button>
         <button class="mini-btn" id="replaceBtn" style="margin-left:auto" aria-label="選んでいるスタンプの絵柄を切り替える">絵柄変更</button>
       </div>
