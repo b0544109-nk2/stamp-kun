@@ -307,6 +307,10 @@
       html[data-ui="b"] #nudgeStepBtn, html[data-ui="c"] #nudgeStepBtn{display:none}
       html[data-ui="b"] .nudge-btn, html[data-ui="c"] .nudge-btn{width:31px;height:30px}
       html[data-ui="b"] .nudge-pad, html[data-ui="c"] .nudge-pad{gap:4px}
+      html[data-ui="b"] .sliders-row, html[data-ui="c"] .sliders-row{flex-wrap:nowrap}
+      html[data-ui="b"] .slider-group, html[data-ui="c"] .slider-group{flex:1 1 0}
+      html[data-ui="b"] #dupBtn svg, html[data-ui="c"] #dupBtn svg,
+      html[data-ui="b"] #delBtn svg, html[data-ui="c"] #delBtn svg{display:none}
       /* ---------- toast ---------- */
       .toast{
         position:fixed;left:50%;bottom:190px;transform:translate(-50%,20px);
@@ -401,7 +405,7 @@
         <div id="stampHandle" class="stamp-handle" role="button" aria-label="持ち手：ドラッグでスタンプを動かす"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l-3 3-3-3"/><path d="M19 9l3 3-3 3"/><path d="M2 12h20"/><path d="M12 2v20"/></svg>うごかす</div>
         <div class="detect-spin" id="detectSpin"><span>顔を探しています…</span></div>
       </div>
-      <div id="verBadge" class="ver-badge">ver 1.2.14</div>
+      <div id="verBadge" class="ver-badge">ver 1.2.15</div>
       <button id="zoomReset" class="zoom-reset" type="button">全体表示</button>
     </div>
 
@@ -412,7 +416,7 @@
       <div class="row sliders-row">
         <div class="slider-group">
           <label for="sizeRange">大きさ</label>
-          <input type="range" id="sizeRange" min="2" max="70" step="1" />
+          <input type="range" id="sizeRange" min="2" max="40" step="0.5" />
         </div>
         <div class="slider-group">
           <label for="rotRange">傾き</label>
@@ -940,7 +944,7 @@
       var st=selectedStamp();
       if(!st && replaceMode){ replaceMode=false; var rbx=$('replaceBtn'); if(rbx) rbx.classList.remove('armed'); }
       editBar.classList.toggle('show', !!st);
-      if(st){ sizeRange.value=Math.round(st.size*100); rotRange.value=Math.round(st.rot); }
+      if(st){ sizeRange.value=Math.round(st.size*200)/2; rotRange.value=Math.round(st.rot); }
     }
     /* place the external drag handle just below the selected stamp (flips above near the bottom edge) */
     function positionHandle(){
@@ -1245,7 +1249,7 @@
     document.addEventListener('visibilitychange', function(){ if(document.hidden) resetGestures(); });
     function clamp01(v){ return Math.min(.97, Math.max(.03, v)); }
     function syncEditBarValues(st){
-      sizeRange.value=Math.round(st.size*100);
+      sizeRange.value=Math.round(st.size*200)/2;
       var r=Math.round(st.rot%360); if(r>180)r-=360; if(r<-180)r+=360;
       rotRange.value=Math.max(-60,Math.min(60,r));
     }
