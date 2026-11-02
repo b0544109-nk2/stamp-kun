@@ -345,7 +345,7 @@
         </button>
         <button class="mode-btn" id="modeAuto" role="tab" aria-selected="false">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" stroke-dasharray="4 3"/><circle cx="9" cy="10" r=".5" fill="currentColor"/><circle cx="15" cy="10" r=".5" fill="currentColor"/><path d="M8.5 15c1 1.2 2.2 1.8 3.5 1.8s2.5-.6 3.5-1.8"/></svg>
-          丸で囲んで自動
+          丸で囲んで自動（β）
         </button>
       </div>
     </div>
@@ -368,7 +368,7 @@
         <div id="stampHandle" class="stamp-handle" role="button" aria-label="持ち手：ドラッグでスタンプを動かす"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l-3 3-3-3"/><path d="M19 9l3 3-3 3"/><path d="M2 12h20"/><path d="M12 2v20"/></svg>うごかす</div>
         <div class="detect-spin" id="detectSpin"><span>顔を探しています…</span></div>
       </div>
-      <div id="verBadge" class="ver-badge">ver 1.2.9</div>
+      <div id="verBadge" class="ver-badge">ver 1.2.10</div>
       <button id="zoomReset" class="zoom-reset" type="button">全体表示</button>
     </div>
 
@@ -829,7 +829,7 @@
       }).observe(stage);
     }
     if(window.ResizeObserver){
-      new ResizeObserver(function(){ if(photoBitmap) fitCanvas(); }).observe(stage);
+      new ResizeObserver(function(){ if(photoBitmap) fitCanvas(true); }).observe(stage);
     }
     fileInput.addEventListener('change', function(){ if(fileInput.files[0]) loadPhoto(fileInput.files[0]); fileInput.value=''; });
     ['dragover','dragenter'].forEach(function(ev){ stage.addEventListener(ev,function(e){ e.preventDefault(); emptyState.classList.add('dragging'); }); });
