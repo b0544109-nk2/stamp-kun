@@ -405,7 +405,7 @@
         <div id="stampHandle" class="stamp-handle" role="button" aria-label="持ち手：ドラッグでスタンプを動かす"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l-3 3-3-3"/><path d="M19 9l3 3-3 3"/><path d="M2 12h20"/><path d="M12 2v20"/></svg>うごかす</div>
         <div class="detect-spin" id="detectSpin"><span>顔を探しています…</span></div>
       </div>
-      <div id="verBadge" class="ver-badge">ver 1.2.17</div>
+      <div id="verBadge" class="ver-badge">ver 1.2.18</div>
       <button id="zoomReset" class="zoom-reset" type="button">全体表示</button>
     </div>
 
@@ -966,7 +966,21 @@
       stampHandleEl.classList.toggle('above', above);
       stampHandleEl.classList.add('show');
     }
+    /* overlap is fine, but a new stamp landing completely inside an
+       existing stamp would be invisible: refuse to place it.
+       Stamps are treated as circles (the emoji face fills the box). */
+    function stampFullyCovered(x, y, size){
+      var cx=x*natW, cy=y*natH, r=size*natW/2;
+      for(var i=0;i<stamps.length;i++){
+        var e=stamps[i], er=e.size*natW/2;
+        if(r>er) continue;
+        var dx=cx-e.x*natW, dy=cy-e.y*natH;
+        if(Math.sqrt(dx*dx+dy*dy)+r<=er+1) return true;
+      }
+      return false;
+    }
     function addStamp(file, x, y, size, rot, styleId){
+      if(stampFullyCovered(x, y, size)) return null;
       var st={id:nextId++, file:file, style:styleId||currentStyle, x:x, y:y, size:size, rot:rot||0};
       stamps.push(st); selectedId=st.id; engagedId=null;
       renderStamps(st.id);
@@ -996,7 +1010,8 @@
     $('delBtn').addEventListener('click', function(){ if(selectedId!=null) removeStamp(selectedId); });
     $('dupBtn').addEventListener('click', function(){
       var st=selectedStamp(); if(!st) return;
-      addStamp(st.file, Math.min(.92, st.x+.05), Math.min(.92, st.y+.05), st.size, st.rot, st.style);
+      if(!addStamp(st.file, Math.min(.92, st.x+.05), Math.min(.92, st.y+.05), st.size, st.rot, st.style))
+        toast('コピーが大きなスタンプにすっぽり隠れてしまいます', '元のスタンプを少し動かしてからコピーしてみてください');
     });
     /* ---- arrow-button nudge (tap = step px, hold = repeat, 1px/10px toggle) ---- */
     var nudgeStepPx=1;
@@ -1228,7 +1243,8 @@
       if(dragState.type==='bg'){
         if(!dragState.moved){
           // tap on photo in free mode -> place selected stamp
-          addStamp(selectedType.f, clamp01(p.x), clamp01(p.y), .20 * styleScale(), 0);
+          if(!addStamp(selectedType.f, clamp01(p.x), clamp01(p.y), .20 * styleScale(), 0))
+            toast('そこは大きなスタンプにすっぽり隠れてしまいます', '少しずらした場所に貼ってみてください');
         } else if(selectedId!=null && viewScale<=1){
           selectedId=null; renderStamps();
         }
@@ -1409,16 +1425,20 @@
       try{ found=await detectRect(xN, yN, wN, hN) || []; }catch(e){ found=[]; }
       detectSpin.classList.remove('show');
       if(found.length){
+        var placed=0;
         found.forEach(function(fd){
-          addStamp(selectedType.f, clamp01(fd.cx), clamp01(fd.cy),
-                   Math.min(.85, Math.max(.03, fd.size * styleScale())), Math.round(fd.angle*10)/10);
+          if(addStamp(selectedType.f, clamp01(fd.cx), clamp01(fd.cy),
+                   Math.min(.85, Math.max(.03, fd.size * styleScale())), Math.round(fd.angle*10)/10)) placed++;
         });
-        if(found.length>=2) toast(found.length+'人の顔を検知して貼りました', 'それぞれ個別に動かしたり、大きさや傾きを変えたりできます');
+        if(placed===0) toast('検知した顔は、すでに大きなスタンプで隠れていました', '隠れている顔には重ねて貼らないようにしています');
+        else if(placed>=2) toast(placed+'人の顔を検知して貼りました', 'それぞれ個別に動かしたり、大きさや傾きを変えたりできます');
         else toast('顔を検知して貼りました', '大きさと傾きは自動調整済み。ドラッグやスライダーで微調整できます');
       } else {
-        addStamp(selectedType.f, clamp01(rect.x+rect.w/2), clamp01(rect.y+rect.h/2),
-                 Math.min(.85, Math.max(.03, Math.min(rect.w, rect.h)*1.05 * styleScale())), 0);
-        toast('顔は見つからなかったので、囲んだ大きさで貼りました', '位置や大きさはそのまま調整できます');
+        if(addStamp(selectedType.f, clamp01(rect.x+rect.w/2), clamp01(rect.y+rect.h/2),
+                 Math.min(.85, Math.max(.03, Math.min(rect.w, rect.h)*1.05 * styleScale())), 0))
+          toast('顔は見つからなかったので、囲んだ大きさで貼りました', '位置や大きさはそのまま調整できます');
+        else
+          toast('囲んだ範囲は、すでに大きなスタンプで隠れています', '隠れている場所には重ねて貼らないようにしています');
       }
     }
 
