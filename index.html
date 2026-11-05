@@ -405,7 +405,7 @@
         <div id="stampHandle" class="stamp-handle" role="button" aria-label="持ち手：ドラッグでスタンプを動かす"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l-3 3-3-3"/><path d="M19 9l3 3-3 3"/><path d="M2 12h20"/><path d="M12 2v20"/></svg>うごかす</div>
         <div class="detect-spin" id="detectSpin"><span>顔を探しています…</span></div>
       </div>
-      <div id="verBadge" class="ver-badge">ver 1.2.18</div>
+      <div id="verBadge" class="ver-badge">ver 1.2.19</div>
       <button id="zoomReset" class="zoom-reset" type="button">全体表示</button>
     </div>
 
@@ -1430,15 +1430,12 @@
           if(addStamp(selectedType.f, clamp01(fd.cx), clamp01(fd.cy),
                    Math.min(.85, Math.max(.03, fd.size * styleScale())), Math.round(fd.angle*10)/10)) placed++;
         });
-        if(placed===0) toast('検知した顔は、すでに大きなスタンプで隠れていました', '隠れている顔には重ねて貼らないようにしています');
-        else if(placed>=2) toast(placed+'人の顔を検知して貼りました', 'それぞれ個別に動かしたり、大きさや傾きを変えたりできます');
+        if(placed>=2) toast(placed+'人の顔を検知して貼りました', 'それぞれ個別に動かしたり、大きさや傾きを変えたりできます');
         else toast('顔を検知して貼りました', '大きさと傾きは自動調整済み。ドラッグやスライダーで微調整できます');
       } else {
         if(addStamp(selectedType.f, clamp01(rect.x+rect.w/2), clamp01(rect.y+rect.h/2),
                  Math.min(.85, Math.max(.03, Math.min(rect.w, rect.h)*1.05 * styleScale())), 0))
           toast('顔は見つからなかったので、囲んだ大きさで貼りました', '位置や大きさはそのまま調整できます');
-        else
-          toast('囲んだ範囲は、すでに大きなスタンプで隠れています', '隠れている場所には重ねて貼らないようにしています');
       }
     }
 
