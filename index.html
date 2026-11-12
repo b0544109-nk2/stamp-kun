@@ -398,6 +398,7 @@
           写真を選ぶ
         </label>
         <p style="margin:14px 0 0;font-size:11.5px">ここに写真をドラッグ＆ドロップしてもOK（PC）</p>
+        <p style="margin:8px 0 0;font-size:11.5px">スマホでは、写真アプリやLINEの「共有」→「スタンプくんっ」でも開けます（ホーム画面に追加済みの場合）</p>
       </div>
       <div id="photoWrap" class="no-photo">
         <canvas id="photoCanvas"></canvas>
@@ -405,7 +406,7 @@
         <div id="stampHandle" class="stamp-handle" role="button" aria-label="持ち手：ドラッグでスタンプを動かす"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l-3 3-3-3"/><path d="M19 9l3 3-3 3"/><path d="M2 12h20"/><path d="M12 2v20"/></svg>うごかす</div>
         <div class="detect-spin" id="detectSpin"><span>顔を探しています…</span></div>
       </div>
-      <div id="verBadge" class="ver-badge">ver 1.2.20</div>
+      <div id="verBadge" class="ver-badge">ver 1.2.21</div>
       <button id="zoomReset" class="zoom-reset" type="button">全体表示</button>
     </div>
 
@@ -910,6 +911,23 @@
       new ResizeObserver(function(){ if(photoBitmap) fitCanvas(true); }).observe(stage);
     }
     fileInput.addEventListener('change', function(){ if(fileInput.files[0]) loadPhoto(fileInput.files[0]); fileInput.value=''; });
+    // Photo handed over via the OS share sheet (Web Share Target):
+    // the service worker stashed it in a cache and redirected here with ?shared=1.
+    (function receiveSharedPhoto(){
+      if(!/[?&]shared=1(&|$)/.test(location.search)) return;
+      try{ history.replaceState(null, '', location.pathname); }catch(e){}
+      if(!('caches' in window)){ toast('共有された写真を受け取れませんでした'); return; }
+      var key = new URL('share-inbox-photo', location.href).toString();
+      caches.match(key).then(function(res){
+        if(!res){ toast('共有された写真を受け取れませんでした'); return null; }
+        return res.blob().then(function(blob){
+          var f = null;
+          try{ f = new File([blob], 'shared-photo', { type: blob.type || 'image/jpeg' }); }catch(e){}
+          loadPhoto(f || blob);
+          return caches.open('stampkun-share-v1').then(function(c){ return c.delete(key); }).catch(function(){});
+        });
+      }).catch(function(){ toast('共有された写真を受け取れませんでした'); });
+    })();
     ['dragover','dragenter'].forEach(function(ev){ stage.addEventListener(ev,function(e){ e.preventDefault(); emptyState.classList.add('dragging'); }); });
     stage.addEventListener('dragleave', function(e){ e.preventDefault(); emptyState.classList.remove('dragging'); });
     stage.addEventListener('drop', function(e){ var f=e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if(f) loadPhoto(f); });
